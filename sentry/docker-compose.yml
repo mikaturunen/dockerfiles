@@ -1,0 +1,33 @@
+data:
+    image: busybox:latest
+    volumes:
+        - /data
+        - /var/lib/postgresql/data
+    entrypoint: /bin/echo
+
+redis:
+    image: redis:2.8
+    volumes_from:
+        - data
+    restart: always
+
+postgres:
+    image: postgres:9.4
+    volumes_from:
+        - data
+    restart: always
+
+www:
+    build: .
+    ports:
+        - "8080"
+    links:
+        - postgres
+        - redis
+    volumes_from:
+        - data
+    entrypoint: sentry
+    command: start --noinput
+    env_file:
+        - environment.sh
+    restart: always
