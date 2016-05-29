@@ -1,3 +1,4 @@
+# Setup data volumes
 data:
     image: busybox:latest
     volumes:
@@ -5,29 +6,51 @@ data:
         - /var/lib/postgresql/data
     entrypoint: /bin/echo
 
-redis:
-    image: redis:2.8
-    volumes_from:
-        - data
-    restart: always
 
+# Setup databases required by sentry
 postgres:
     image: postgres:9.4
+    environment:
+        - POSTGRES_USER:sentry
+        - POSTGRES_PASSWORD:sentry
     volumes_from:
         - data
-    restart: always
 
-www:
-    build: .
-    ports:
-        - "8080"
-    links:
-        - postgres
-        - redis
+redis:
+    image: redis:latest
     volumes_from:
         - data
-    entrypoint: sentry
-    command: start --noinput
+
+
+# Setup sentry itself
+sentry:
+    image: sentry:latest
+    links:
+        - redis
+        - postgres
+    ports:
+        - 9000:9000
+    stdin_open: true
+    tty: true
     env_file:
-        - environment.sh
-    restart: always
+        environment.sh
+
+
+# Setup the workers sentry needs
+sentry_celery_beat:
+    image: sentry:latest
+    links:
+        - redis
+        - postgres
+    command: "sentry celery beat"
+    env_file:
+        environment.sh
+
+sentry_celery_worker:
+    image: sentry:latest
+    links:
+        - redis
+        - postgres
+    command: "sentry celery worker"
+    env_file:
+        environment.sh
